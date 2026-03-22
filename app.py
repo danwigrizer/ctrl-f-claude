@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Conversations Viewer — local Mac app."""
+"""CTRL+F+Claude — local Mac app for browsing Claude Code sessions."""
 
 import webview
 from api import Api
@@ -7,7 +7,7 @@ from api import Api
 if __name__ == "__main__":
     api = Api()
     window = webview.create_window(
-        "Claude Conversations",
+        "CTRL+F+Claude",
         "index.html",
         js_api=api,
         width=1100,
