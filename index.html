@@ -373,6 +373,7 @@
     margin: 2px 2px 2px 0;
   }
   .btn:hover { background: var(--hover); color: var(--text); }
+  .btn.active { background: var(--card-bg); color: var(--text); border-color: var(--accent); }
   .btn.primary { border-color: var(--accent); color: var(--accent); }
   .btn.primary:hover { background: var(--accent); color: #fff; }
   .btn.success { border-color: #2d7a4f; color: #6fcf97; }
@@ -492,6 +493,7 @@
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="Search all conversations..." />
   </div>
+  <button class="btn" style="-webkit-app-region:no-drag;margin-left:4px;" onclick="refreshCurrentView()" title="Refresh">Refresh</button>
 </div>
 
 <div class="layout">
@@ -530,6 +532,16 @@
   let convSearchMatches = [];
   let convSearchIdx = -1;
   let bookmarks = {};
+
+  async function refreshCurrentView() {
+    if (currentTab === 'settings') { loadSettings(); return; }
+    if (currentTab === 'plugins') { loadPlugins(); return; }
+    if (currentView === 'projects') { loadProjects(); }
+    else if (currentView === 'conversations' && currentProjectId) { loadConversations(currentProjectId, currentProjectName); }
+    else if (currentView === 'messages') { loadProjects(); }
+    else { loadProjects(); }
+    showToast('Refreshed');
+  }
 
   async function renameConversation(projectId, conversationId) {
     const newName = prompt('Enter a name for this conversation:');
@@ -641,7 +653,7 @@
     document.getElementById('mainHeader').style.removeProperty('display');
 
     // Show recent conversations in main content
-    const recent = await pywebview.api.get_recent_conversations(15);
+    const recent = await pywebview.api.get_recent_conversations(30);
     const container = document.getElementById('mainContent');
     let mainHtml = '';
 
@@ -694,18 +706,17 @@
   }
 
   // ── Conversations ──
-  async function loadConversations(projectId, projectName) {
-    currentView = 'conversations';
-    currentProjectId = projectId;
-    currentProjectName = projectName;
-    document.getElementById('backBtn').style.display = 'flex';
-    document.getElementById('sidebarTitle').textContent = 'Conversations';
-    document.getElementById('mainHeader').textContent = projectName;
-    document.getElementById('mainContent').innerHTML = '<div class="empty-state">Select a conversation</div>';
+  let allConvos = [];
+  let activeFilter = 'all';
 
-    const convos = await pywebview.api.get_conversations(projectId);
+  function renderConversations(convos, projectId) {
     const list = document.getElementById('sidebarList');
+    // Keep the filter bar if it exists
+    const existingFilter = document.getElementById('convo-filters');
     list.innerHTML = '';
+    if (existingFilter) list.appendChild(existingFilter);
+    else list.insertAdjacentHTML('beforeend', buildFilterBar());
+
     for (const c of convos) {
       const item = document.createElement('div');
       item.className = 'sidebar-item';
@@ -773,6 +784,40 @@
 
       list.appendChild(item);
     }
+  }
+
+  function buildFilterBar() {
+    return `<div id="convo-filters" style="display:flex;gap:4px;padding:4px 2px 8px;flex-wrap:wrap;">
+      <button class="btn ${activeFilter==='all'?'active':''}" onclick="applyFilter('all')">All</button>
+      <button class="btn ${activeFilter==='10+'?'active':''}" onclick="applyFilter('10+')">10+ msgs</button>
+      <button class="btn ${activeFilter==='25+'?'active':''}" onclick="applyFilter('25+')">25+ msgs</button>
+      <button class="btn ${activeFilter==='50+'?'active':''}" onclick="applyFilter('50+')">50+ msgs</button>
+      <button class="btn ${activeFilter==='named'?'active':''}" onclick="applyFilter('named')">Named</button>
+    </div>`;
+  }
+
+  function applyFilter(filter) {
+    activeFilter = filter;
+    let filtered = allConvos;
+    if (filter === '10+') filtered = allConvos.filter(c => c.message_count >= 10);
+    else if (filter === '25+') filtered = allConvos.filter(c => c.message_count >= 25);
+    else if (filter === '50+') filtered = allConvos.filter(c => c.message_count >= 50);
+    else if (filter === 'named') filtered = allConvos.filter(c => c.custom_title);
+    renderConversations(filtered, currentProjectId);
+  }
+
+  async function loadConversations(projectId, projectName) {
+    currentView = 'conversations';
+    currentProjectId = projectId;
+    currentProjectName = projectName;
+    activeFilter = 'all';
+    document.getElementById('backBtn').style.display = 'flex';
+    document.getElementById('sidebarTitle').textContent = 'Conversations';
+    document.getElementById('mainHeader').textContent = projectName;
+    document.getElementById('mainContent').innerHTML = '<div class="empty-state">Select a conversation</div>';
+
+    allConvos = await pywebview.api.get_conversations(projectId);
+    renderConversations(allConvos, projectId);
   }
 
   // ── Messages ──

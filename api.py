@@ -130,31 +130,7 @@ def get_projects():
         if not folder.is_dir():
             continue
         convos = list(folder.glob("*.jsonl"))
-        convos = [c for c in convos if not c.stem.startswith("agent-")]
-        # Filter out empty files and system-only conversations
-        valid_convos = []
-        for c in convos:
-            if c.stat().st_size == 0:
-                continue
-            has_assistant = False
-            try:
-                with open(c, "r") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            entry = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        if entry.get("type") == "assistant":
-                            has_assistant = True
-                            break
-            except Exception:
-                continue
-            if has_assistant:
-                valid_convos.append(c)
-        convos = valid_convos
+        convos = [c for c in convos if not c.stem.startswith("agent-") and c.stat().st_size > 0]
         if not convos:
             continue
 
@@ -257,14 +233,12 @@ def get_conversations(project_id):
         if filepath.stem.startswith("agent-"):
             continue
 
-        # Skip empty files (0 bytes = just a session stub)
         if filepath.stat().st_size == 0:
             continue
 
         first_user_msg = ""
         custom_title = ""
         msg_count = 0
-        has_assistant = False
         timestamp = None
         cwd = ""
         try:
@@ -285,8 +259,6 @@ def get_conversations(project_id):
                         cwd = entry.get("cwd", "")
                     if entry.get("type") in ("user", "assistant"):
                         msg_count += 1
-                        if entry.get("type") == "assistant":
-                            has_assistant = True
                         if not first_user_msg and entry.get("type") == "user":
                             msg = entry.get("message", {})
                             content = msg.get("content", "")
@@ -294,10 +266,6 @@ def get_conversations(project_id):
                             if text.strip():
                                 first_user_msg = text[:150]
         except Exception:
-            continue
-
-        # Skip conversations with no assistant response (slash command logs, metadata-only)
-        if not has_assistant:
             continue
 
         session_id = filepath.stem
@@ -981,7 +949,6 @@ class Api:
                     continue
                 preview = ""
                 custom_title = ""
-                has_assistant = False
                 timestamp = ""
                 cwd = ""
                 try:
@@ -1000,8 +967,6 @@ class Api:
                                 timestamp = entry.get("timestamp") or ""
                             if not cwd:
                                 cwd = entry.get("cwd", "")
-                            if entry.get("type") == "assistant":
-                                has_assistant = True
                             if entry.get("type") == "user" and not preview:
                                 msg = entry.get("message", {})
                                 content = msg.get("content", "")
@@ -1009,8 +974,6 @@ class Api:
                                 if text.strip():
                                     preview = text[:120]
                 except Exception:
-                    continue
-                if not has_assistant:
                     continue
                 all_convos.append({
                     "id": filepath.stem,
