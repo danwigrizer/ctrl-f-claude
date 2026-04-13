@@ -853,10 +853,13 @@
 
     for (const m of messages) {
       const div = document.createElement('div');
-      div.className = `message ${m.role === 'user' ? 'user' : 'assistant'}`;
+      const roleClass = m.role === 'user' ? 'user' : 'assistant';
+      const roleLabel = m.role === 'user' ? 'You' : m.role === 'tool_result' ? 'Tool Result' : 'Claude';
+      div.className = `message ${roleClass}`;
+      if (m.role === 'tool_result') div.style.opacity = '0.7';
       div.innerHTML = `
-        <div class="role-label">${m.role === 'user' ? 'You' : 'Claude'}</div>
-        <div class="msg-text">${renderText(m.text)}</div>
+        <div class="role-label">${roleLabel}</div>
+        <div class="msg-text">${m.role === 'tool_result' ? '<pre style="white-space:pre-wrap;font-size:12px;margin:0;">' + esc(m.text) + '</pre>' : renderText(m.text)}</div>
         <div class="msg-meta">${fmtTime(m.timestamp)}${m.model ? ' &middot; ' + m.model : ''}</div>
       `;
       container.appendChild(div);

@@ -327,22 +327,45 @@ def get_messages(project_id, conversation_id):
                 continue
 
             msg_type = entry.get("type", "")
-            if msg_type not in ("user", "assistant"):
-                continue
 
-            msg = entry.get("message", {})
-            content = msg.get("content", "")
-            text = _extract_text_from_content(content)
-
-            if not text.strip():
-                continue
-
-            messages.append({
-                "role": msg_type,
-                "text": text,
-                "timestamp": entry.get("timestamp", ""),
-                "model": msg.get("model", ""),
-            })
+            if msg_type in ("user", "assistant"):
+                msg = entry.get("message", {})
+                content = msg.get("content", "")
+                text = _extract_text_from_content(content)
+                if not text.strip():
+                    continue
+                messages.append({
+                    "role": msg_type,
+                    "text": text,
+                    "timestamp": entry.get("timestamp", ""),
+                    "model": msg.get("model", ""),
+                })
+            elif msg_type == "tool_result":
+                # Tool results contain output from tool calls
+                content = entry.get("content", "")
+                if isinstance(content, str):
+                    text = content
+                elif isinstance(content, list):
+                    parts = []
+                    for block in content:
+                        if isinstance(block, str):
+                            parts.append(block)
+                        elif isinstance(block, dict) and block.get("type") == "text":
+                            parts.append(block.get("text", ""))
+                    text = "\n".join(parts)
+                else:
+                    text = ""
+                if not text.strip():
+                    continue
+                # Truncate very long tool results
+                if len(text) > 5000:
+                    text = text[:5000] + "\n... (truncated)"
+                messages.append({
+                    "role": "tool_result",
+                    "text": text,
+                    "timestamp": entry.get("timestamp", ""),
+                    "model": "",
+                })
 
     return messages
 
