@@ -711,11 +711,8 @@
 
   function renderConversations(convos, projectId) {
     const list = document.getElementById('sidebarList');
-    // Keep the filter bar if it exists
-    const existingFilter = document.getElementById('convo-filters');
     list.innerHTML = '';
-    if (existingFilter) list.appendChild(existingFilter);
-    else list.insertAdjacentHTML('beforeend', buildFilterBar());
+    list.insertAdjacentHTML('beforeend', buildFilterBar());
 
     for (const c of convos) {
       const item = document.createElement('div');
@@ -816,7 +813,9 @@
     document.getElementById('mainHeader').textContent = projectName;
     document.getElementById('mainContent').innerHTML = '<div class="empty-state">Select a conversation</div>';
 
-    allConvos = await pywebview.api.get_conversations(projectId);
+    const raw = await pywebview.api.get_conversations(projectId);
+    allConvos = Array.isArray(raw) ? raw : (raw && raw.value ? raw.value : []);
+    document.getElementById('sidebarTitle').textContent = `Conversations (${allConvos.length})`;
     renderConversations(allConvos, projectId);
   }
 
