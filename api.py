@@ -240,6 +240,7 @@ def get_conversations(project_id):
         custom_title = ""
         msg_count = 0
         timestamp = None
+        last_timestamp = None
         cwd = ""
         try:
             with open(filepath, "r") as f:
@@ -253,8 +254,11 @@ def get_conversations(project_id):
                         continue
                     if entry.get("type") == "custom-title":
                         custom_title = entry.get("customTitle", "")
+                    entry_ts = entry.get("timestamp") or ""
                     if not timestamp:
-                        timestamp = entry.get("timestamp") or ""
+                        timestamp = entry_ts
+                    if entry_ts:
+                        last_timestamp = entry_ts
                     if not cwd:
                         cwd = entry.get("cwd", "")
                     if entry.get("type") in ("user", "assistant"):
@@ -351,6 +355,8 @@ def search_conversations(query):
     if not CLAUDE_DIR.exists():
         return results
 
+    path_map = _folder_to_real_path_map()
+
     for folder in CLAUDE_DIR.iterdir():
         if not folder.is_dir():
             continue
@@ -358,6 +364,7 @@ def search_conversations(query):
             if filepath.stem.startswith("agent-"):
                 continue
             try:
+                cwd = ""
                 with open(filepath, "r") as f:
                     for line in f:
                         line = line.strip()
@@ -367,6 +374,8 @@ def search_conversations(query):
                             entry = json.loads(line)
                         except json.JSONDecodeError:
                             continue
+                        if not cwd:
+                            cwd = entry.get("cwd", "")
                         if entry.get("type") not in ("user", "assistant"):
                             continue
                         msg = entry.get("message", {})
@@ -394,6 +403,9 @@ def search_conversations(query):
                             match_start = idx - start
                             match_len = len(query)
 
+                            # Resolve cwd: prefer conversation cwd, fall back to project real path
+                            resolved_cwd = cwd or path_map.get(folder.name, "")
+
                             results.append({
                                 "project_id": folder.name,
                                 "project_name": name,
@@ -404,6 +416,7 @@ def search_conversations(query):
                                 "match_start": match_start,
                                 "match_len": match_len,
                                 "timestamp": entry.get("timestamp", ""),
+                                "cwd": resolved_cwd,
                             })
                             break
             except Exception:
@@ -625,8 +638,12 @@ class Api:
             "path": str(settings_path),
         }
 
-    def open_in_iterm(self, session_id, cwd):
+    def open_in_iterm(self, session_id, cwd, project_id=None):
         """Open a conversation in iTerm2 with claude --resume."""
+        # Resolve cwd: use provided cwd, fall back to project real path
+        if not cwd and project_id:
+            path_map = _folder_to_real_path_map()
+            cwd = path_map.get(project_id, "")
         cwd = cwd or str(Path.home())
         script = f'''
         tell application "iTerm"

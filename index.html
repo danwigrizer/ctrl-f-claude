@@ -837,7 +837,7 @@
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;">${esc(preview || 'Conversation')}</span>
       <button class="btn" style="flex-shrink:0;margin-left:4px;" onclick="renameConversation('${esc(projectId)}','${esc(conversationId)}')">Rename</button>
       <button class="btn" style="flex-shrink:0;margin-left:4px;" onclick="navigator.clipboard.writeText('${esc(conversationId)}'); showToast('Session ID copied')">Copy ID</button>
-      <button class="btn primary" style="flex-shrink:0;margin-left:4px;" onclick="pywebview.api.open_in_iterm('${esc(conversationId)}','${esc(cwd || '')}')">Resume in iTerm</button>`;
+      <button class="btn primary" style="flex-shrink:0;margin-left:4px;" onclick="pywebview.api.open_in_iterm('${esc(conversationId)}','${esc(cwd || '')}','${esc(projectId)}')">Resume in iTerm</button>`;
     header.style.display = 'flex';
     header.style.alignItems = 'center';
     closeConvSearch();
@@ -878,6 +878,7 @@
     if (!query) { loadProjects(); return; }
     searchTimeout = setTimeout(async () => {
       const results = await pywebview.api.search(query);
+      if (currentView === 'messages') return; // Don't overwrite an open conversation
       currentView = 'search';
       document.getElementById('sidebarTitle').textContent = `Search: ${results.length} results`;
       document.getElementById('backBtn').style.display = 'flex';
@@ -904,7 +905,8 @@
           <div class="sr-meta">${r.role} &middot; ${shortDate(r.timestamp)}</div>
         `;
         div.onclick = () => {
-          loadMessages(r.project_id, r.conversation_id, r.snippet.substring(0, 80), null, null, query);
+          clearTimeout(searchTimeout);
+          loadMessages(r.project_id, r.conversation_id, r.snippet.substring(0, 80), null, r.cwd || '', query);
         };
         container.appendChild(div);
       }
