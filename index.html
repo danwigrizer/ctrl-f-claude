@@ -533,6 +533,14 @@
   let convSearchIdx = -1;
   let bookmarks = {};
 
+  // Pywebview may wrap responses as {value: ...} in some versions; unwrap defensively.
+  function unwrap(r) {
+    if (r && typeof r === 'object' && !Array.isArray(r) && 'value' in r && Object.keys(r).length === 1) {
+      return r.value;
+    }
+    return r;
+  }
+
   async function refreshCurrentView() {
     if (currentTab === 'settings') { loadSettings(); return; }
     if (currentTab === 'plugins') { loadPlugins(); return; }
@@ -546,7 +554,7 @@
   async function renameConversation(projectId, conversationId) {
     const newName = prompt('Enter a name for this conversation:');
     if (!newName || !newName.trim()) return;
-    const result = await pywebview.api.rename_conversation(projectId, conversationId, newName.trim());
+    const result = unwrap(await pywebview.api.rename_conversation(projectId, conversationId, newName.trim())) || {};
     if (result.ok) {
       showToast('Renamed to: ' + result.title);
       // Update the header
@@ -559,10 +567,10 @@
   }
 
   async function loadBookmarks() {
-    bookmarks = await pywebview.api.get_bookmarks() || {};
+    bookmarks = unwrap(await pywebview.api.get_bookmarks()) || {};
   }
   async function toggleBookmark(projectId, conversationId, label) {
-    const result = await pywebview.api.toggle_bookmark(projectId, conversationId, label);
+    const result = unwrap(await pywebview.api.toggle_bookmark(projectId, conversationId, label)) || {};
     bookmarks = result.bookmarks || {};
     showToast(result.action === 'added' ? 'Bookmarked' : 'Bookmark removed');
   }
@@ -653,7 +661,7 @@
     document.getElementById('mainHeader').style.removeProperty('display');
 
     // Show recent conversations in main content
-    const recent = await pywebview.api.get_recent_conversations(30);
+    const recent = unwrap(await pywebview.api.get_recent_conversations(30)) || [];
     const container = document.getElementById('mainContent');
     let mainHtml = '';
 
@@ -692,7 +700,7 @@
     }
 
     // Projects in sidebar
-    const projects = await pywebview.api.get_projects();
+    const projects = unwrap(await pywebview.api.get_projects()) || [];
     const list = document.getElementById('sidebarList');
     list.innerHTML = '';
     for (const p of projects) {
@@ -813,8 +821,8 @@
     document.getElementById('mainHeader').textContent = projectName;
     document.getElementById('mainContent').innerHTML = '<div class="empty-state">Select a conversation</div>';
 
-    const raw = await pywebview.api.get_conversations(projectId);
-    allConvos = Array.isArray(raw) ? raw : (raw && raw.value ? raw.value : []);
+    const raw = unwrap(await pywebview.api.get_conversations(projectId));
+    allConvos = Array.isArray(raw) ? raw : [];
     document.getElementById('sidebarTitle').textContent = `Conversations (${allConvos.length})`;
     renderConversations(allConvos, projectId);
   }
@@ -841,7 +849,7 @@
     header.style.alignItems = 'center';
     closeConvSearch();
 
-    const messages = await pywebview.api.get_messages(projectId, conversationId);
+    const messages = unwrap(await pywebview.api.get_messages(projectId, conversationId)) || [];
     const container = document.getElementById('mainContent');
     container.innerHTML = '';
 
@@ -879,7 +887,7 @@
     const query = e.target.value.trim();
     if (!query) { loadProjects(); return; }
     searchTimeout = setTimeout(async () => {
-      const results = await pywebview.api.search(query);
+      const results = unwrap(await pywebview.api.search(query)) || [];
       if (currentView === 'messages') return; // Don't overwrite an open conversation
       currentView = 'search';
       document.getElementById('sidebarTitle').textContent = `Search: ${results.length} results`;
@@ -1220,7 +1228,7 @@
   }
 
   async function loadPlugins() {
-    const data = await pywebview.api.get_plugins();
+    const data = unwrap(await pywebview.api.get_plugins()) || {};
     const view = document.getElementById('pluginsView');
     let html = '';
 
@@ -1335,7 +1343,7 @@
     }
 
     // Standalone skills
-    const standaloneSkills = await pywebview.api.get_standalone_skills();
+    const standaloneSkills = unwrap(await pywebview.api.get_standalone_skills()) || [];
     html += '<div class="settings-section"><h2>Standalone Skills</h2>';
     html += '<div style="color:var(--text-dim);font-size:12px;margin-bottom:10px;">Skills in <code>~/.claude/skills/</code> (user) or <code>.claude/skills/</code> (project). Available without a plugin.</div>';
     if (standaloneSkills.length === 0) {
@@ -1358,7 +1366,7 @@
   }
 
   async function loadSettings() {
-    const data = await pywebview.api.get_settings();
+    const data = unwrap(await pywebview.api.get_settings()) || {};
     settingsData = data;
     const view = document.getElementById('settingsView');
 
@@ -1457,7 +1465,7 @@
     html += '</div>';
 
     // ── Permissions Audit ──
-    const audit = await pywebview.api.get_permissions_audit();
+    const audit = unwrap(await pywebview.api.get_permissions_audit()) || {};
     html += '<div class="settings-section"><h2>Permissions Audit</h2>';
     html += '<div style="color:var(--text-dim);font-size:12px;margin-bottom:10px;">Permission inheritance: Managed (highest) > Local > Project > User (lowest). Deny at any level cannot be overridden.</div>';
 
