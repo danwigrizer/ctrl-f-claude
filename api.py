@@ -69,7 +69,7 @@ def _compute_unique_names(projects):
 def _read_first_entry(filepath):
     """Read the first valid JSON line from a JSONL file."""
     try:
-        with open(filepath, "r") as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -194,7 +194,7 @@ def get_conversations(project_id):
         msg_count = 0
         first_timestamp = timestamp
         try:
-            with open(filepath, "r") as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:
@@ -243,7 +243,7 @@ def get_conversations(project_id):
         last_timestamp = None
         cwd = ""
         try:
-            with open(filepath, "r") as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:
@@ -316,7 +316,7 @@ def get_messages(project_id, conversation_id):
         return []
 
     messages = []
-    with open(filepath, "r") as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -392,7 +392,7 @@ def search_conversations(query):
                 first_timestamp = ""
                 name_matched = False
                 content_match = None
-                with open(filepath, "r") as f:
+                with open(filepath, "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
                         if not line:
@@ -485,7 +485,16 @@ def search_conversations(query):
 
 
 def _get_latest_backup():
-    """Read the most recent Claude backup file for MCP/settings data."""
+    """Read the live ~/.claude.json (or fall back to latest backup) for MCP/settings data."""
+    # Prefer the live ~/.claude.json (current authoritative file)
+    live = Path.home() / ".claude.json"
+    if live.exists():
+        try:
+            with open(live, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    # Fallback: latest backup file
     backup_dir = CLAUDE_HOME / "backups"
     if not backup_dir.exists():
         return {}
@@ -493,7 +502,7 @@ def _get_latest_backup():
     if not backups:
         return {}
     try:
-        with open(backups[-1], "r") as f:
+        with open(backups[-1], "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {}
@@ -502,7 +511,7 @@ def _get_latest_backup():
 def _read_json_file(path):
     """Read a JSON file, return empty dict on failure."""
     try:
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {}
@@ -682,7 +691,7 @@ class Api:
         settings["permissions"]["deny"] = deny_list
         # Ensure directory exists
         settings_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(settings_path, "w") as f:
+        with open(settings_path, "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2)
         return {"ok": True, "path": str(settings_path)}
 
@@ -977,7 +986,7 @@ class Api:
             return {"error": "Conversation not found"}
         # Remove any existing custom-title entry, then append the new one
         lines = []
-        with open(filepath, "r") as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             for line in f:
                 stripped = line.strip()
                 if not stripped:
@@ -996,7 +1005,7 @@ class Api:
             "sessionId": conversation_id,
         })
         lines.append(title_entry)
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
         return {"ok": True, "title": new_title}
 
@@ -1027,7 +1036,7 @@ class Api:
                 timestamp = ""
                 cwd = ""
                 try:
-                    with open(filepath, "r") as f:
+                    with open(filepath, "r", encoding="utf-8") as f:
                         for line in f:
                             line = line.strip()
                             if not line:
@@ -1083,7 +1092,7 @@ class Api:
                 "added": datetime.now().isoformat(),
             }
             action = "added"
-        with open(BOOKMARKS_FILE, "w") as f:
+        with open(BOOKMARKS_FILE, "w", encoding="utf-8") as f:
             json.dump(bookmarks, f, indent=2)
         return {"action": action, "bookmarks": bookmarks}
 
