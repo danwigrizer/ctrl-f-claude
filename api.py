@@ -388,6 +388,10 @@ def search_conversations(query):
                 continue
             try:
                 cwd = ""
+                custom_title = ""
+                first_timestamp = ""
+                name_matched = False
+                content_match = None
                 with open(filepath, "r") as f:
                     for line in f:
                         line = line.strip()
@@ -399,7 +403,15 @@ def search_conversations(query):
                             continue
                         if not cwd:
                             cwd = entry.get("cwd", "")
+                        if not first_timestamp:
+                            first_timestamp = entry.get("timestamp", "")
+                        if entry.get("type") == "custom-title":
+                            custom_title = entry.get("customTitle", "")
+                            if query_lower in custom_title.lower():
+                                name_matched = True
                         if entry.get("type") not in ("user", "assistant"):
+                            continue
+                        if content_match:
                             continue
                         msg = entry.get("message", {})
                         content = msg.get("content", "")
@@ -415,33 +427,56 @@ def search_conversations(query):
 
                         idx = text.lower().find(query_lower)
                         if idx >= 0:
-                            name = folder.name.replace("-", "/")
-                            if name.startswith("/"):
-                                name = name[1:]
-
-                            # Build context snippet around match
                             start = max(0, idx - 50)
                             end = min(len(text), idx + len(query) + 100)
-                            snippet = text[start:end]
-                            match_start = idx - start
-                            match_len = len(query)
-
-                            # Resolve cwd: prefer conversation cwd, fall back to project real path
-                            resolved_cwd = cwd or path_map.get(folder.name, "")
-
-                            results.append({
-                                "project_id": folder.name,
-                                "project_name": name,
-                                "short_name": _short_name(name),
-                                "conversation_id": filepath.stem,
+                            content_match = {
+                                "snippet": text[start:end],
+                                "match_start": idx - start,
+                                "match_len": len(query),
                                 "role": entry.get("type"),
-                                "snippet": snippet,
-                                "match_start": match_start,
-                                "match_len": match_len,
                                 "timestamp": entry.get("timestamp", ""),
-                                "cwd": resolved_cwd,
-                            })
-                            break
+                            }
+
+                if not name_matched and not content_match:
+                    continue
+
+                name = folder.name.replace("-", "/")
+                if name.startswith("/"):
+                    name = name[1:]
+                resolved_cwd = cwd or path_map.get(folder.name, "")
+
+                if name_matched:
+                    # Build snippet from the title itself with highlight
+                    idx = custom_title.lower().find(query_lower)
+                    results.append({
+                        "project_id": folder.name,
+                        "project_name": name,
+                        "short_name": _short_name(name),
+                        "conversation_id": filepath.stem,
+                        "role": "name",
+                        "snippet": custom_title,
+                        "match_start": idx,
+                        "match_len": len(query),
+                        "timestamp": first_timestamp,
+                        "cwd": resolved_cwd,
+                        "custom_title": custom_title,
+                        "match_type": "name",
+                    })
+                if content_match:
+                    results.append({
+                        "project_id": folder.name,
+                        "project_name": name,
+                        "short_name": _short_name(name),
+                        "conversation_id": filepath.stem,
+                        "role": content_match["role"],
+                        "snippet": content_match["snippet"],
+                        "match_start": content_match["match_start"],
+                        "match_len": content_match["match_len"],
+                        "timestamp": content_match["timestamp"],
+                        "cwd": resolved_cwd,
+                        "custom_title": custom_title,
+                        "match_type": "content",
+                    })
             except Exception:
                 continue
 

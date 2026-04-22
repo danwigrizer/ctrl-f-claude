@@ -904,19 +904,32 @@
         div.className = 'search-result';
 
         // Build highlighted snippet
-        const before = esc(r.snippet.substring(0, r.match_start));
-        const match = esc(r.snippet.substring(r.match_start, r.match_start + r.match_len));
-        const after = esc(r.snippet.substring(r.match_start + r.match_len));
+        const ms = Math.max(0, r.match_start);
+        const before = esc(r.snippet.substring(0, ms));
+        const match = esc(r.snippet.substring(ms, ms + r.match_len));
+        const after = esc(r.snippet.substring(ms + r.match_len));
         const highlighted = `${before}<span class="search-highlight">${match}</span>${after}`;
 
+        const isNameMatch = r.match_type === 'name';
+        const badge = isNameMatch ? '<span class="tag" style="background:var(--accent);color:#fff;margin-right:6px;">named</span>' : '';
+        const roleLabel = isNameMatch ? 'title match' : r.role;
+        const snippetHtml = isNameMatch
+          ? `<strong>${highlighted}</strong>`
+          : highlighted;
+        const titleLine = !isNameMatch && r.custom_title
+          ? `<div class="sr-snippet" style="color:var(--text-dim);font-style:italic;">${esc(r.custom_title)}</div>`
+          : '';
+
         div.innerHTML = `
-          <div class="sr-project">${esc(r.short_name)}</div>
-          <div class="sr-snippet">${highlighted}</div>
-          <div class="sr-meta">${r.role} &middot; ${shortDate(r.timestamp)}</div>
+          <div class="sr-project">${badge}${esc(r.short_name)}</div>
+          ${titleLine}
+          <div class="sr-snippet">${snippetHtml}</div>
+          <div class="sr-meta">${roleLabel} &middot; ${shortDate(r.timestamp)}</div>
         `;
         div.onclick = () => {
           clearTimeout(searchTimeout);
-          loadMessages(r.project_id, r.conversation_id, r.snippet.substring(0, 80), null, r.cwd || '', query);
+          const preview = r.custom_title || r.snippet.substring(0, 80);
+          loadMessages(r.project_id, r.conversation_id, preview, null, r.cwd || '', isNameMatch ? '' : query);
         };
         container.appendChild(div);
       }
