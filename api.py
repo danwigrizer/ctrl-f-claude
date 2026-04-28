@@ -721,7 +721,8 @@ class Api:
             end tell
         end tell
         '''
-        subprocess.Popen(["osascript", "-e", script])
+        clean_env = {k: v for k, v in os.environ.items() if k not in ("PYTHONHOME", "PYTHONPATH")}
+        subprocess.Popen(["osascript", "-e", script], env=clean_env)
 
     def get_plugins(self):
         """Return installed plugins, marketplaces, and blocklist."""
